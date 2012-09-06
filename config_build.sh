@@ -5,7 +5,7 @@
 APP_NAME=basicnative-mobile
 CHROME_PROVIDERS=
 CLEAN_UP=1
-ROOT_FILES="bootstrap.js"
+ROOT_FILES="bootstrap.js jni.jsm"
 ROOT_DIRS=
 BEFORE_BUILD=
 AFTER_BUILD=
