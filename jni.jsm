@@ -653,15 +653,15 @@ function JNIClassName(jenv, jcls) {
 
 // XXX handle arrays
 function JNILoadClass(jenv, classname, props) {
-  var descTypes = {
+  var sigTypes = {
     V: "Void", Z: "Boolean", B: "Byte", C: "Char", S: "Short",
     I: "Int", J: "Long", F: "Float", D: "Double", L: "Object", "[": "Object"
   };
-  var desc2type = function(desc) { return descTypes[desc.charAt(0)]; };
-  var desc2classname = function(desc) {
-    if (desc.charAt(0) !== 'L') return null;
-    desc = desc.substring(1, desc.indexOf(';')).replace(/\//g, '.');
-    return desc;
+  var sig2type = function(sig) { return sigTypes[sig.charAt(0)]; };
+  var sig2classname = function(sig) {
+    if (sig.charAt(0) !== 'L') return null;
+    sig = sig.substring(1, sig.indexOf(';')).replace(/\//g, '.');
+    return sig;
   };
 
   var jenvpp = function() { return jenv.contents.contents; };
@@ -690,8 +690,8 @@ function JNILoadClass(jenv, classname, props) {
   // XXX should cast method arguments to proper primitive types using signature
 
   (props.static_fields || []).forEach(function(fld) {
-    var jfld = jenvpp().GetStaticFieldID(jenv, jcls, fld.name, fld.desc);
-    var ty = desc2type(fld.desc), nm = desc2classname(fld.desc);
+    var jfld = jenvpp().GetStaticFieldID(jenv, jcls, fld.name, fld.sig);
+    var ty = sig2type(fld.sig), nm = sig2classname(fld.sig);
     var getter = "GetStatic"+ty+"Field", setter = "SetStatic"+ty+"Field";
     ensure(jenv, nm);
     var props =  {
@@ -709,14 +709,14 @@ function JNILoadClass(jenv, classname, props) {
     Object.defineProperty(rpp, fld.name, props);
   });
   (props.static_methods || []).forEach(function(mtd) {
-    var jmtd = jenvpp().GetStaticMethodID(jenv, jcls, mtd.name, mtd.desc);
-    var returnSig = mtd.desc.substring(mtd.desc.indexOf(')')+1);
-    var ty = desc2type(returnSig), nm = desc2classname(returnSig);
+    var jmtd = jenvpp().GetStaticMethodID(jenv, jcls, mtd.name, mtd.sig);
+    var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
+    var ty = sig2type(returnSig), nm = sig2classname(returnSig);
     var call = "CallStatic"+ty+"Method";
     ensure(jenv, nm);
-    r[mtd.name] = r[mtd.name + mtd.desc] =
+    r[mtd.name] = r[mtd.name + mtd.sig] =
     // add static methods to object instances, too.
-    rpp[mtd.name] = rpp[mtd.name + mtd.desc] = function() {
+    rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
       var i, j = jenvpp();
       var args = [jenv, jcls, jmtd];
       for (i=0; i<arguments.length; i++) {
@@ -727,9 +727,9 @@ function JNILoadClass(jenv, classname, props) {
   });
   (props.constructors || []).forEach(function(mtd) {
     mtd.name = "<init>";
-    var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.desc);
-    var returnSig = mtd.desc.substring(mtd.desc.indexOf(')')+1);
-    r['new'] = r['new'+mtd.desc] = r[mtd.name + mtd.desc] = function() {
+    var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.sig);
+    var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
+    r['new'] = r['new'+mtd.sig] = r[mtd.name + mtd.sig] = function() {
       var i, j = jenvpp();
       var args = [jenv, jcls, jmtd];
       for (i=0; i<arguments.length; i++) {
@@ -739,8 +739,8 @@ function JNILoadClass(jenv, classname, props) {
     };
   });
   (props.fields || []).forEach(function(fld) {
-    var jfld = jenvpp().GetFieldID(jenv, jcls, fld.name, fld.desc);
-    var ty = desc2type(fld.desc), nm = desc2classname(fld.desc);
+    var jfld = jenvpp().GetFieldID(jenv, jcls, fld.name, fld.sig);
+    var ty = sig2type(fld.sig), nm = sig2classname(fld.sig);
     var getter = "Get"+ty+"Field", setter = "Set"+ty+"Field";
     ensure(jenv, nm);
     Object.defineProperty(rpp, fld.name, {
@@ -755,12 +755,12 @@ function JNILoadClass(jenv, classname, props) {
     });
   });
   (props.methods || []).forEach(function(mtd) {
-    var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.desc);
-    var returnSig = mtd.desc.substring(mtd.desc.indexOf(')')+1);
-    var ty = desc2type(returnSig), nm = desc2classname(returnSig);
+    var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.sig);
+    var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
+    var ty = sig2type(returnSig), nm = sig2classname(returnSig);
     var call = "Call"+ty+"Method";
     ensure(jenv, nm);
-    rpp[mtd.name] = rpp[mtd.name + mtd.desc] = function() {
+    rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
       var i, j = jenvpp();
       var args = [jenv, unwrap(this), jmtd];
       for (i=0; i<arguments.length; i++) {

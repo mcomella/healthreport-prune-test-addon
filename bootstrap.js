@@ -21,47 +21,47 @@ function showNotification(aWindow) {
   // declare fields & methods in java classes that we're going to use.
   var Object = JNI.LoadClass(jenv, "java.lang.Object", {
     methods: [
-      { name: "toString", desc: "()Ljava/lang/String;" }
+      { name: "toString", sig: "()Ljava/lang/String;" }
     ],
   });
   var R = {};
   R.drawable = JNI.LoadClass(jenv, "android.R$drawable", {
     static_fields: [
-      { name: "stat_notify_more", desc: "I" },
+      { name: "stat_notify_more", sig: "I" },
     ],
   });
   var Context = JNI.LoadClass(jenv, "android.content.Context", {
     static_fields: [
-      { name: "NOTIFICATION_SERVICE", desc: "Ljava/lang/String;" }
+      { name: "NOTIFICATION_SERVICE", sig: "Ljava/lang/String;" }
     ],
     methods: [
       { name: "getSystemService",
-        desc: "(Ljava/lang/String;)Ljava/lang/Object;" }
+        sig: "(Ljava/lang/String;)Ljava/lang/Object;" }
     ],
   });
   var GeckoApp = JNI.LoadClass(jenv, "org.mozilla.gecko.GeckoApp", {
     static_fields: [
-      { name: "mAppContext", desc: "Lorg/mozilla/gecko/GeckoApp;" }
+      { name: "mAppContext", sig: "Lorg/mozilla/gecko/GeckoApp;" }
     ],
   });
   var NotificationManager=JNI.LoadClass(jenv,"android.app.NotificationManager",{
     methods: [
-      { name: "notify", desc: "(ILandroid/app/Notification;)V" },
+      { name: "notify", sig: "(ILandroid/app/Notification;)V" },
     ],
   });
   var NotificationBuilder=JNI.LoadClass(jenv,"android.app.Notification$Builder",{
     constructors: [
-      { name: "<init>", desc: "(Landroid/content/Context;)V" },
+      { name: "<init>", sig: "(Landroid/content/Context;)V" },
     ],
     methods: [
       { name: "setContentText",
-        desc: "(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;" },
+        sig: "(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;" },
       { name: "setContentTitle",
-        desc: "(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;" },
+        sig: "(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;" },
       { name: "setSmallIcon",
-        desc: "(I)Landroid/app/Notification$Builder;" },
+        sig: "(I)Landroid/app/Notification$Builder;" },
       { name: "getNotification", // renamed to build() in API 16 (Jelly Bean)
-        desc: "()Landroid/app/Notification;" },
+        sig: "()Landroid/app/Notification;" },
     ],
   });
 
