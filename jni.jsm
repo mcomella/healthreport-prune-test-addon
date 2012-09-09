@@ -605,7 +605,15 @@ var GetJNIForThread = libxul.declare("GetJNIForThread",
                                      ctypes.default_abi,
                                      JNINativeInterface.ptr.ptr);
 
-var registry = {};
+var registry = Object.create(null);
+var classes = Object.create(null);
+
+function JNIUnloadClasses(jenv) {
+  Object.getOwnPropertyNames(registry).forEach(function(classname) {
+    var jcls = unwrap(registry[classname]);
+    jenv.contents.contents.DeleteGlobalRef(jenv, jcls);
+  });
+}
 
 var PREFIX = 'js#';
 var wrap = function(obj, classname) {
@@ -621,19 +629,19 @@ var unwrap = function(obj) {
 };
 var ensure = function(jenv, classname) {
   if (classname===null) { return null; }
-  if (!(classname in registry)) {
+  if (!Object.hasOwnProperty.call(registry, classname)) {
     JNILoadClass(jenv, classname, {});
   }
   return registry[classname];
 };
 
-function NewJNIString(jenv, value) {
+function JNINewString(jenv, value) {
   var s = jenv.contents.contents.NewStringUTF(jenv, ctypes.char.array()(value));
   ensure(jenv, "java.lang.String");
   return wrap(s, "java.lang.String");
 }
 
-function ReadJNIString(jenv, jstring_value) {
+function JNIReadString(jenv, jstring_value) {
   var val = unwrap(jstring_value);
   if ((!val) || val.isNull()) { return null; }
   var chars = jenv.contents.contents.GetStringUTFChars(jenv, val, null);
@@ -648,7 +656,7 @@ function JNIClassName(jenv, jcls) {
   var jmthd = jenvpp().GetMethodID(jenv, jclscls,
                                   "getName", "()Ljava/lang/String;");
   var name = jenvpp().CallObjectMethod(jenv, jcls, jmthd);
-  return ReadJNIString(jenv, name);
+  return JNIReadString(jenv, name);
 }
 
 // XXX handle arrays
@@ -665,15 +673,25 @@ function JNILoadClass(jenv, classname, props) {
   };
 
   var jenvpp = function() { return jenv.contents.contents; };
-  var jcls = jenvpp().FindClass(jenv, classname);
 
-  if (!(classname in registry)) {
+  // allocate a local reference frame with enough space
+  var numLocals = 2; // this class and superclass
+  ["static_fields", "static_methods", "constructors", "fields", "methods"]
+    .forEach(function(f) { numLocals += (props[f] || []).length; });
+  jenvpp().PushLocalFrame(jenv, numLocals);
+
+  var jcls;
+  if (Object.hasOwnProperty.call(registry, classname)) {
+    jcls = unwrap(registry[classname]);
+  } else {
+    jcls = jenvpp().NewGlobalRef(jenv, jenvpp().FindClass(jenv, classname));
+
     // get name of superclass
     var jsuper = jenvpp().GetSuperclass(jenv, jcls);
     jsuper = jsuper.isNull() ? null : JNIClassName(jenv, jsuper);
 
     registry[classname] = Object.create(ensure(jenv, jsuper));
-    registry[classname][PREFIX+'obj'] = jcls;
+    registry[classname][PREFIX+'obj'] = jcls; // global ref, persistent.
     registry[classname][PREFIX+'proto'] =
       function(o) { this[PREFIX+'obj'] = o; };
     registry[classname][PREFIX+'proto'].prototype =
@@ -683,7 +701,19 @@ function JNILoadClass(jenv, classname, props) {
     registry[classname].__cast__ = function(obj) {
       return wrap(unwrap(obj), classname);
     };
+
+    // make wrapper accessible via the classes object.
+    var root = classes, i;
+    var parts = classname.split('.');
+    for (i = 0; i < parts.length-1; i++) {
+      if (!Object.hasOwnProperty.call(root, parts[i])) {
+        root[parts[i]] = Object.create(null);
+      }
+      root = root[parts[i]];
+    }
+    root[parts[parts.length-1]] = registry[classname];
   }
+
   var r = registry[classname];
   var rpp = r[PREFIX+'proto'].prototype;
 
@@ -769,9 +799,11 @@ function JNILoadClass(jenv, classname, props) {
       return wrap(j[call].apply(j, args), nm);
     };
   });
+  jenvpp().PopLocalFrame(jenv, null);
   return r;
 }
 
+// exported object
 var JNI = {
   // primitive types
   jboolean: jboolean,
@@ -784,9 +816,13 @@ var JNI = {
   jdouble: jdouble,
   jsize: jsize,
 
+  // class registry
+  classes: classes,
+
   // methods
   GetForThread: GetJNIForThread,
-  NewString: NewJNIString,
-  ReadString: ReadJNIString,
+  NewString: JNINewString,
+  ReadString: JNIReadString,
   LoadClass: JNILoadClass,
+  UnloadClasses: JNIUnloadClasses
 };

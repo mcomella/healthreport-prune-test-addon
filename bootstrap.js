@@ -13,9 +13,9 @@ function showToast(aWindow) {
   aWindow.NativeWindow.toast.show("Showing you a toast", "short");
 }
 
-function showNotification(aWindow) {
-  // This shows an Android notification, using the JNI interface to the
-  // Android SDK.
+// Tell the JNI module about the signatures of the Java methods
+// we want to use.
+function loadJNI() {
   var jenv = JNI.GetForThread();
 
   // declare fields & methods in java classes that we're going to use.
@@ -24,8 +24,7 @@ function showNotification(aWindow) {
       { name: "toString", sig: "()Ljava/lang/String;" }
     ],
   });
-  var R = {};
-  R.drawable = JNI.LoadClass(jenv, "android.R$drawable", {
+  var R$drawable = JNI.LoadClass(jenv, "android.R$drawable", {
     static_fields: [
       { name: "stat_notify_more", sig: "I" },
     ],
@@ -64,6 +63,24 @@ function showNotification(aWindow) {
         sig: "()Landroid/app/Notification;" },
     ],
   });
+}
+function unloadJNI() {
+  var jenv = JNI.GetForThread();
+  JNI.UnloadClasses(jenv);
+}
+
+function showNotification(aWindow) {
+  // This shows an Android notification, using the JNI interface to the
+  // Android SDK.
+  var jenv = JNI.GetForThread();
+  jenv.contents.contents.PushLocalFrame(jenv, 100);
+
+  // imports
+  var Context = JNI.classes.android.content.Context;
+  var GeckoApp = JNI.classes.org.mozilla.gecko.GeckoApp;
+  var NotificationManager = JNI.classes.android.app.NotificationManager;
+  var NotificationBuilder = JNI.classes.android.app.Notification$Builder;
+  var R = { drawable: JNI.classes.android.R$drawable };
 
   // String ns = Context.NOTIFICATION_SERVICE;
   // NotificationManager mNotificationManager =
@@ -88,8 +105,11 @@ function showNotification(aWindow) {
   var HELLO_ID = 1;
   mNotificationManager.notify(JNI.jint(HELLO_ID), noti);
 
-  // demonstrate how to use toString()
+  // demonstrate how to use toString() on a Java object
   aWindow.NativeWindow.toast.show(JNI.ReadString(jenv,noti.toString()),"short");
+
+  // clean up memory allocated by JNI
+  jenv.contents.contents.PopLocalFrame(jenv, null);
 }
 
 function showDoorhanger(aWindow) {
@@ -175,6 +195,7 @@ function startup(aData, aReason) {
 
   // Load JNI module
   Cu.import("resource://"+RSRC+"/jni.jsm");
+  loadJNI();
 
   // Load into any existing windows
   let windows = Services.wm.getEnumerator("navigator:browser");
@@ -194,6 +215,7 @@ function shutdown(aData, aReason) {
     return;
 
   // Unload JNI module
+  unloadJNI();
   Cu.unload("resource://"+RSRC+"/jni.jsm");
 
   // teardown resource: alias
