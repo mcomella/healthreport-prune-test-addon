@@ -95,15 +95,15 @@ function showNotification(aWindow) {
   //     .setContentText("This is a notification")
   //     .build();
   var noti = NotificationBuilder['new'](ctxt)
-    .setContentTitle(JNI.NewString(jenv, "Hello, World!"))
-    .setContentText(JNI.NewString(jenv, "This is a notification"))
-    .setSmallIcon(JNI.jint(R.drawable.stat_notify_more))
+    .setContentTitle("Hello, World!")
+    .setContentText("This is a notification")
+    .setSmallIcon(R.drawable.stat_notify_more)
     .getNotification();
 
   // final int HELLO_ID = 1;
   // mNotificationManager.notify(HELLO_ID, notification);
   var HELLO_ID = 1;
-  mNotificationManager.notify(JNI.jint(HELLO_ID), noti);
+  mNotificationManager.notify(HELLO_ID, noti);
 
   // demonstrate how to use toString() on a Java object
   aWindow.NativeWindow.toast.show(JNI.ReadString(jenv,noti.toString()),"short");
