@@ -117,6 +117,7 @@ function copyLink(aWindow, aTarget) {
 var gToastMenuId = null;
 var gDoorhangerMenuId = null;
 var gContextMenuId = null;
+var gNotificationMenuId = null;
 
 function loadIntoWindow(window) {
   if (!window)
