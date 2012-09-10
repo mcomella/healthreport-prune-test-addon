@@ -616,9 +616,24 @@ function JNIUnloadClasses(jenv) {
 }
 
 var PREFIX = 'js#';
-var wrap = function(obj, classname) {
-  if (!classname) { return obj; }
-  var proto = registry[classname][PREFIX+'proto'];
+// this regex matches one component of a type signature:
+// any number of array modifiers, followed by either a
+// primitive type character or L<classname>;
+var sigRegex = function() /\[*([VZBCSIJFD]|L([^.\/;]+(\/[^.\/;]+)*);)/;
+var ensureSig = function(classname_or_signature) {
+    // convert a classname into a signature,
+    // leaving unchanged signatures.  We assume that
+    // anything not a valid signature is a classname.
+  var m = sigRegex().exec(classname_or_signature);
+  return (m && m[0] === classname_or_signature) ? classname_or_signature :
+    'L' + classname_or_signature.replace(/\./g, '/') + ';';
+};
+var wrap = function(obj, classSig) {
+  if (!classSig) { return obj; }
+  // don't wrap primitive types.
+  if (classSig.charAt(0)!=='L' &&
+      classSig.charAt(0)!=='[') { return obj; }
+  var proto = registry[classSig][PREFIX+'proto'];
   return new proto(obj);
 };
 var unwrap = function(obj) {
@@ -627,18 +642,17 @@ var unwrap = function(obj) {
   }
   return obj;
 };
-var ensure = function(jenv, classname) {
-  if (classname===null) { return null; }
-  if (!Object.hasOwnProperty.call(registry, classname)) {
-    JNILoadClass(jenv, classname, {});
+var ensureLoaded = function(jenv, classSig) {
+  if (!Object.hasOwnProperty.call(registry, classSig)) {
+    JNILoadClass(jenv, classSig, {});
   }
-  return registry[classname];
+  return registry[classSig];
 };
 
 function JNINewString(jenv, value) {
   var s = jenv.contents.contents.NewStringUTF(jenv, ctypes.char.array()(value));
-  ensure(jenv, "java.lang.String");
-  return wrap(s, "java.lang.String");
+  ensureLoaded(jenv, "Ljava/lang/String;");
+  return wrap(s, "Ljava/lang/String;");
 }
 
 function JNIReadString(jenv, jstring_value) {
@@ -650,80 +664,138 @@ function JNIReadString(jenv, jstring_value) {
   return result;
 }
 
-function JNIClassName(jenv, jcls) {
-  var jenvpp = function() { return jenv.contents.contents; };
-  var jclscls = jenvpp().FindClass(jenv, "java.lang.Class");
-  var jmthd = jenvpp().GetMethodID(jenv, jclscls,
-                                  "getName", "()Ljava/lang/String;");
-  var name = jenvpp().CallObjectMethod(jenv, jcls, jmthd);
-  return JNIReadString(jenv, name);
+// return the class object for a signature string.
+// allocates 1 or 2 local refs
+function JNIClassObj(jenv, classSig) {
+    var jenvpp = function() { return jenv.contents.contents; };
+    // Deal with funny calling convention of JNI FindClass method.
+    // Classes get the leading & trailing chars stripped; primitives
+    // have to be looked up via their wrapper type.
+    var prim = function(ty) {
+        var jcls = jenvpp().FindClass(jenv, "java/lang/"+ty);
+        var jfld = jenvpp().GetStaticFieldID(jenv, jcls, "TYPE",
+                                             "Ljava/lang/Class;");
+        return jenvpp().GetStaticObjectField(jenv, jcls, jfld);
+    };
+    switch (classSig.charAt(0)) {
+    case '[':
+        return jenvpp().FindClass(jenv, classSig);
+    case 'L':
+        classSig = classSig.substring(1, classSig.indexOf(';'));
+        return jenvpp().FindClass(jenv, classSig);
+    case 'V': return prim('Void');
+    case 'Z': return prim('Boolean');
+    case 'B': return prim('Byte');
+    case 'C': return prim('Char');
+    case 'S': return prim('Short');
+    case 'I': return prim('Integer');
+    case 'J': return prim('Long');
+    case 'F': return prim('Float');
+    case 'D': return prim('Double');
+    }
+    throw new Error("invalid signature");
 }
 
-// XXX handle arrays
-function JNILoadClass(jenv, classname, props) {
+// return the signature string for a Class object.
+// allocates 2 local refs
+function JNIClassSig(jenv, jcls) {
+  var jenvpp = function() { return jenv.contents.contents; };
+  var jclscls = jenvpp().FindClass(jenv, "java/lang/Class");
+  var jmtd = jenvpp().GetMethodID(jenv, jclscls,
+                                  "getName", "()Ljava/lang/String;");
+  var name = jenvpp().CallObjectMethod(jenv, jcls, jmtd);
+  name = JNIReadString(jenv, name);
+  // API is weird.  Make sure we're using slashes not dots
+  name = name.replace(/\./g, '/');
+  // special case primitives, arrays
+  if (name.charAt(0)==='[') return name;
+  switch(name) {
+  case 'void': return 'V';
+  case 'boolean': return 'Z';
+  case 'byte': return 'B';
+  case 'char': return 'C';
+  case 'short': return 'S';
+  case 'int': return 'I';
+  case 'long': return 'J';
+  case 'float': return 'F';
+  case 'double': return 'D';
+  default:
+    return 'L' + name + ';';
+  }
+}
+
+// Create appropriate wrapper fields/methods for a Java class.
+function JNILoadClass(jenv, classSig, props) {
   var sigTypes = {
     V: "Void", Z: "Boolean", B: "Byte", C: "Char", S: "Short",
     I: "Int", J: "Long", F: "Float", D: "Double", L: "Object", "[": "Object"
   };
   var sig2type = function(sig) { return sigTypes[sig.charAt(0)]; };
-  var sig2classname = function(sig) {
-    if (sig.charAt(0) !== 'L') return null;
-    sig = sig.substring(1, sig.indexOf(';')).replace(/\//g, '.');
-    return sig;
-  };
 
   var jenvpp = function() { return jenv.contents.contents; };
 
   // allocate a local reference frame with enough space
-  var numLocals = 2; // this class and superclass
-  ["static_fields", "static_methods", "constructors", "fields", "methods"]
-    .forEach(function(f) { numLocals += (props[f] || []).length; });
+  var numLocals = 5; // this class (1 or 2 local refs) and superclass (3 refs)
   jenvpp().PushLocalFrame(jenv, numLocals);
 
   var jcls;
-  if (Object.hasOwnProperty.call(registry, classname)) {
-    jcls = unwrap(registry[classname]);
+  if (Object.hasOwnProperty.call(registry, classSig)) {
+    jcls = unwrap(registry[classSig]);
   } else {
-    jcls = jenvpp().NewGlobalRef(jenv, jenvpp().FindClass(jenv, classname));
+    jcls = jenvpp().NewGlobalRef(jenv, JNIClassObj(jenv, classSig));
 
     // get name of superclass
     var jsuper = jenvpp().GetSuperclass(jenv, jcls);
-    jsuper = jsuper.isNull() ? null : JNIClassName(jenv, jsuper);
+    if (jsuper.isNull()) {
+      jsuper = null;
+    } else {
+      jsuper = JNIClassSig(jenv, jsuper);
+    }
 
-    registry[classname] = Object.create(ensure(jenv, jsuper));
-    registry[classname][PREFIX+'obj'] = jcls; // global ref, persistent.
-    registry[classname][PREFIX+'proto'] =
+    registry[classSig] = Object.create(jsuper?ensureLoaded(jenv, jsuper):null);
+    registry[classSig][PREFIX+'obj'] = jcls; // global ref, persistent.
+    registry[classSig][PREFIX+'proto'] =
       function(o) { this[PREFIX+'obj'] = o; };
-    registry[classname][PREFIX+'proto'].prototype =
-      Object.create(jsuper ? ensure(jenv, jsuper)[PREFIX+'proto'].prototype :
+    registry[classSig][PREFIX+'proto'].prototype =
+      Object.create(jsuper ? ensureLoaded(jenv, jsuper)[PREFIX+'proto'].prototype :
                     null);
     // Add a __cast__ method to the wrapper corresponding to the class
-    registry[classname].__cast__ = function(obj) {
-      return wrap(unwrap(obj), classname);
+    registry[classSig].__cast__ = function(obj) {
+      return wrap(unwrap(obj), classSig);
     };
 
     // make wrapper accessible via the classes object.
-    var root = classes, i;
-    var parts = classname.split('.');
-    for (i = 0; i < parts.length-1; i++) {
-      if (!Object.hasOwnProperty.call(root, parts[i])) {
-        root[parts[i]] = Object.create(null);
-      }
-      root = root[parts[i]];
+    var path = sig2type(classSig).toLowerCase();
+    if (classSig.charAt(0)==='L') {
+      path = classSig.substring(1, classSig.length-1);
     }
-    root[parts[parts.length-1]] = registry[classname];
+    if (classSig.charAt(0)!=='[') {
+      var root = classes, i;
+      var parts = path.split('/');
+      for (i = 0; i < parts.length-1; i++) {
+        if (!Object.hasOwnProperty.call(root, parts[i])) {
+          root[parts[i]] = Object.create(null);
+        }
+        root = root[parts[i]];
+      }
+      root[parts[parts.length-1]] = registry[classSig];
+    }
   }
 
-  var r = registry[classname];
+  var r = registry[classSig];
   var rpp = r[PREFIX+'proto'].prototype;
+
+  if (classSig.charAt(0)==='[') {
+    // XXX add 'length' field, 'get' and 'set' methods, 'new' constructor
+  }
 
   // XXX should cast method arguments to proper primitive types using signature
 
   (props.static_fields || []).forEach(function(fld) {
     var jfld = jenvpp().GetStaticFieldID(jenv, jcls, fld.name, fld.sig);
-    var ty = sig2type(fld.sig), nm = sig2classname(fld.sig);
+    var ty = sig2type(fld.sig), nm = fld.sig;
     var getter = "GetStatic"+ty+"Field", setter = "SetStatic"+ty+"Field";
-    ensure(jenv, nm);
+    ensureLoaded(jenv, nm);
     var props =  {
       get: function() {
         var j = jenvpp();
@@ -741,9 +813,9 @@ function JNILoadClass(jenv, classname, props) {
   (props.static_methods || []).forEach(function(mtd) {
     var jmtd = jenvpp().GetStaticMethodID(jenv, jcls, mtd.name, mtd.sig);
     var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
-    var ty = sig2type(returnSig), nm = sig2classname(returnSig);
+    var ty = sig2type(returnSig), nm = returnSig;
     var call = "CallStatic"+ty+"Method";
-    ensure(jenv, nm);
+    ensureLoaded(jenv, nm);
     r[mtd.name] = r[mtd.name + mtd.sig] =
     // add static methods to object instances, too.
     rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
@@ -765,14 +837,14 @@ function JNILoadClass(jenv, classname, props) {
       for (i=0; i<arguments.length; i++) {
         args.push(unwrap(arguments[i]));
       }
-      return wrap(j.NewObject.apply(j, args), classname);
+      return wrap(j.NewObject.apply(j, args), classSig);
     };
   });
   (props.fields || []).forEach(function(fld) {
     var jfld = jenvpp().GetFieldID(jenv, jcls, fld.name, fld.sig);
-    var ty = sig2type(fld.sig), nm = sig2classname(fld.sig);
+    var ty = sig2type(fld.sig), nm = fld.sig;
     var getter = "Get"+ty+"Field", setter = "Set"+ty+"Field";
-    ensure(jenv, nm);
+    ensureLoaded(jenv, nm);
     Object.defineProperty(rpp, fld.name, {
       get: function() {
         var j = jenvpp();
@@ -787,9 +859,9 @@ function JNILoadClass(jenv, classname, props) {
   (props.methods || []).forEach(function(mtd) {
     var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.sig);
     var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
-    var ty = sig2type(returnSig), nm = sig2classname(returnSig);
+    var ty = sig2type(returnSig), nm = returnSig;
     var call = "Call"+ty+"Method";
-    ensure(jenv, nm);
+    ensureLoaded(jenv, nm);
     rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
       var i, j = jenvpp();
       var args = [jenv, unwrap(this), jmtd];
@@ -823,6 +895,8 @@ var JNI = {
   GetForThread: GetJNIForThread,
   NewString: JNINewString,
   ReadString: JNIReadString,
-  LoadClass: JNILoadClass,
+  LoadClass: function(jenv, classname_or_signature, props) {
+    return JNILoadClass(jenv, ensureSig(classname_or_signature), props);
+  },
   UnloadClasses: JNIUnloadClasses
 };
