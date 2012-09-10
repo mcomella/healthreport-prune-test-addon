@@ -823,6 +823,24 @@ function JNIReadString(jenv, jstring_value) {
   return result;
 }
 
+var sigInfo = {
+  'V': { name: 'Void', longName: 'Void', ctype: ctypes.void_t },
+  'Z': { name: 'Boolean', longName: 'Boolean', ctype: jboolean },
+  'B': { name: 'Byte', longName: 'Byte', ctype: jbyte },
+  'C': { name: 'Char', longName: 'Char', ctype: jchar },
+  'S': { name: 'Short', longName: 'Short', ctype: jshort },
+  'I': { name: 'Int', longName: 'Integer', ctype: jint },
+  'J': { name: 'Long', longName: 'Long', ctype: jlong },
+  'F': { name: 'Float', longName: 'Float', ctype: jfloat },
+  'D': { name: 'Double', longName: 'Double', ctype: jdouble },
+  'L': { name: 'Object', longName: 'Object', ctype: jobject },
+  '[': { name: 'Object', longName: 'Object', ctype: jarray }
+};
+
+var sig2type = function(sig) { return sigInfo[sig.charAt(0)].name; };
+var sig2ctype = function(sig) { return sigInfo[sig.charAt(0)].ctype; };
+var sig2prim = function(sig) { return sigInfo[sig.charAt(0)].longName; };
+
 // return the class object for a signature string.
 // allocates 1 or 2 local refs
 function JNIClassObj(jenv, classSig) {
@@ -842,17 +860,9 @@ function JNIClassObj(jenv, classSig) {
     case 'L':
         classSig = classSig.substring(1, classSig.indexOf(';'));
         return jenvpp().FindClass(jenv, classSig);
-    case 'V': return prim('Void');
-    case 'Z': return prim('Boolean');
-    case 'B': return prim('Byte');
-    case 'C': return prim('Char');
-    case 'S': return prim('Short');
-    case 'I': return prim('Integer');
-    case 'J': return prim('Long');
-    case 'F': return prim('Float');
-    case 'D': return prim('Double');
+    default:
+      return prim(sig2prim(classSig));
     }
-    throw new Error("invalid signature");
 }
 
 // return the signature string for a Class object.
@@ -883,18 +893,15 @@ function JNIClassSig(jenv, jcls) {
   }
 }
 
+
 // Create appropriate wrapper fields/methods for a Java class.
 function JNILoadClass(jenv, classSig, props) {
-  var sigTypes = {
-    V: "Void", Z: "Boolean", B: "Byte", C: "Char", S: "Short",
-    I: "Int", J: "Long", F: "Float", D: "Double", L: "Object", "[": "Object"
-  };
-  var sig2type = function(sig) { return sigTypes[sig.charAt(0)]; };
-
   var jenvpp = function() { return jenv.contents.contents; };
 
   // allocate a local reference frame with enough space
-  var numLocals = 5; // this class (1 or 2 local refs) and superclass (3 refs)
+  // this class (1 or 2 local refs) plus superclass (3 refs)
+  // plus array element class (1 or 2 local refs)
+  var numLocals = 7;
   jenvpp().PushLocalFrame(jenv, numLocals);
 
   var jcls;
@@ -916,7 +923,8 @@ function JNILoadClass(jenv, classSig, props) {
     registry[classSig][PREFIX+'proto'] =
       function(o) { this[PREFIX+'obj'] = o; };
     registry[classSig][PREFIX+'proto'].prototype =
-      Object.create(jsuper ? ensureLoaded(jenv, jsuper)[PREFIX+'proto'].prototype :
+      Object.create(jsuper ?
+                    ensureLoaded(jenv, jsuper)[PREFIX+'proto'].prototype :
                     null);
     // Add a __cast__ method to the wrapper corresponding to the class
     registry[classSig].__cast__ = function(obj) {
@@ -945,7 +953,57 @@ function JNILoadClass(jenv, classSig, props) {
   var rpp = r[PREFIX+'proto'].prototype;
 
   if (classSig.charAt(0)==='[') {
-    // XXX add 'length' field, 'get' and 'set' methods, 'new' constructor
+    // add 'length' field for arrays
+    Object.defineProperty(rpp, 'length', {
+      get: function() {
+        return jenvpp().GetArrayLength(jenv, unwrap(this));
+      }
+    });
+    // add 'get' and 'set' methods, 'new' constructor
+    var elemSig = classSig.substring(1);
+    ensureLoaded(jenv, elemSig);
+
+    registry[elemSig].__array__ = r;
+    if (!Object.hasOwnProperty.call(registry[elemSig], 'array'))
+      registry[elemSig].array = r;
+
+    if (elemSig.charAt(0)==='L' || elemSig.charAt(0)==='[') {
+      var elemClass = jenvpp().NewGlobalRef(jenv, JNIClassObj(jenv, elemSig));
+
+      rpp.get = function(idx) {
+        return wrap(jenvpp().GetObjectArrayElement(jenv, unwrap(this), idx),
+                    elemSig);
+      };
+      rpp.set = function(idx, value) {
+        jenvpp().SetObjectArrayElement(jenv, unwrap(this), idx, unwrap(value));
+      };
+      r['new'] = function(length) {
+        return wrap(jenvpp().NewObjectArray(jenv, length, elemClass, null),
+                    classSig);
+      };
+    } else {
+      var ty = sig2type(elemSig), ctype = sig2ctype(elemSig);
+      var constructor = "New"+ty+"Array";
+      var getter = "Get"+ty+"ArrayRegion";
+      var setter = "Set"+ty+"ArrayRegion";
+      rpp.get = function(idx) { return this.getElements(idx, 1)[0]; };
+      rpp.set = function(idx, val) { this.setElements(idx, [val]); };
+      rpp.getElements = function(start, len) {
+        var j = jenvpp();
+        var buf = new (ctype.array())(len);
+        j[getter].call(j, jenv, unwrap(this), start, len, buf);
+        return buf;
+      };
+      rpp.setElements = function(start, vals) {
+        var j = jenvpp();
+        j[setter].call(j, jenv, unwrap(this), start, vals.length,
+                       ctype.array()(vals));
+      };
+      r['new'] = function(length) {
+        var j = jenvpp();
+        return wrap(j[constructor].call(j, jenv, length), classSig);
+      };
+    }
   }
 
   // XXX should cast method arguments to proper primitive types using signature
