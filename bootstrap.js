@@ -63,6 +63,15 @@ function loadJNI() {
         sig: "()Landroid/app/Notification;" },
     ],
   });
+
+  // for array demo
+  JNI.LoadClass(jenv, "[I");
+  JNI.LoadClass(jenv, "java.util.Arrays", {
+    static_methods: [
+      { name: "sort", sig: "([I)V" },
+      { name: "toString", sig: "([I)Ljava/lang/String;" },
+    ]
+  });
 }
 function unloadJNI() {
   var jenv = JNI.GetForThread();
@@ -81,6 +90,9 @@ function showNotification(aWindow) {
   var NotificationManager = JNI.classes.android.app.NotificationManager;
   var NotificationBuilder = JNI.classes.android.app.Notification$Builder;
   var R = { drawable: JNI.classes.android.R$drawable };
+
+  var IntArray = JNI.classes.int.array;
+  var Arrays = JNI.classes.java.util.Arrays;
 
   // String ns = Context.NOTIFICATION_SERVICE;
   // NotificationManager mNotificationManager =
@@ -104,6 +116,15 @@ function showNotification(aWindow) {
   // mNotificationManager.notify(HELLO_ID, notification);
   var HELLO_ID = 1;
   mNotificationManager.notify(HELLO_ID, noti);
+
+  // Sort an array of integers, the hard way.
+  var ia = IntArray.new(5);
+  ia.setElements(0, [5,3,4,2,1]);
+  var before = JNI.ReadString(jenv, Arrays.toString(ia));
+  Arrays.sort(ia);
+  var after  = JNI.ReadString(jenv, Arrays.toString(ia));
+  ia = ia.getElements(0, ia.length);
+  android_log(3, "JNI", before + " -> " + after+" ("+ia+")");
 
   // demonstrate how to use toString() on a Java object
   aWindow.NativeWindow.toast.show(JNI.ReadString(jenv,noti.toString()),"short");
