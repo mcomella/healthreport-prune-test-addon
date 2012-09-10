@@ -808,7 +808,7 @@ var unwrap = function(obj, opt_jenv, opt_ctype) {
 };
 var ensureLoaded = function(jenv, classSig) {
   if (!Object.hasOwnProperty.call(registry, classSig)) {
-    JNILoadClass(jenv, classSig, {});
+    JNILoadClass(jenv, classSig);
   }
   return registry[classSig];
 };
@@ -900,8 +900,9 @@ function JNIClassSig(jenv, jcls) {
 
 
 // Create appropriate wrapper fields/methods for a Java class.
-function JNILoadClass(jenv, classSig, props) {
+function JNILoadClass(jenv, classSig, opt_props) {
   var jenvpp = function() { return jenv.contents.contents; };
+  var props = opt_props || {};
 
   // allocate a local reference frame with enough space
   // this class (1 or 2 local refs) plus superclass (3 refs)
