@@ -1,3 +1,7 @@
+// JavaScript to Java bridge via the Java Native Interface
+// Allows calling into Android SDK from JavaScript in Firefox Add-On.
+// Released into the public domain.
+//  C. Scott Ananian <cscott@laptop.org> (http://cscott.net)
 var EXPORTED_SYMBOLS = ["JNI","android_log"];
 
 Components.utils.import("resource://gre/modules/ctypes.jsm")
