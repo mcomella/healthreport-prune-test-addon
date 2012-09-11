@@ -981,7 +981,16 @@ function JNILoadClass(jenv, classSig, opt_props) {
                     elemSig);
       };
       rpp.set = function(idx, value) {
-        jenvpp().SetObjectArrayElement(jenv, unwrap(this), idx, unwrap(value));
+        jenvpp().SetObjectArrayElement(jenv, unwrap(this), idx,
+                                       unwrap(value, jenv, jobject));
+      };
+      rpp.getElements = function(start, len) {
+        var i, r=[];
+        for (i=0; i<len; i++) { r.push(this.get(start+i)); }
+        return r;
+      };
+      rpp.setElements = function(start, vals) {
+        vals.forEach(function(v, i) { this.set(start+i, v); }.bind(this));
       };
       r['new'] = function(length) {
         return wrap(jenvpp().NewObjectArray(jenv, length, elemClass, null),
@@ -1011,8 +1020,6 @@ function JNILoadClass(jenv, classSig, opt_props) {
       };
     }
   }
-
-  // XXX should cast method arguments to proper primitive types using signature
 
   (props.static_fields || []).forEach(function(fld) {
     var jfld = jenvpp().GetStaticFieldID(jenv, jcls, fld.name, fld.sig);
