@@ -59,6 +59,8 @@ function loadJNI() {
         sig: "(Ljava/lang/CharSequence;)Landroid/app/Notification$Builder;" },
       { name: "setSmallIcon",
         sig: "(I)Landroid/app/Notification$Builder;" },
+      { name: "setSmallIcon", // demonstrate resolution of overloaded methods
+        sig: "(II)Landroid/app/Notification$Builder;" },
       { name: "getNotification", // renamed to build() in API 16 (Jelly Bean)
         sig: "()Landroid/app/Notification;" },
     ],
@@ -66,9 +68,12 @@ function loadJNI() {
 
   // for array demo
   JNI.LoadClass(jenv, "[I");
+  JNI.LoadClass(jenv, "[Ljava/lang/String;");
   JNI.LoadClass(jenv, "java.util.Arrays", {
     static_methods: [
+      { name: "sort", sig: "([Ljava/lang/Object;)V" },
       { name: "sort", sig: "([I)V" },
+      { name: "toString", sig: "([Ljava/lang/Object;)Ljava/lang/String;" },
       { name: "toString", sig: "([I)Ljava/lang/String;" },
     ]
   });
@@ -91,6 +96,7 @@ function showNotification(aWindow) {
   var NotificationBuilder = JNI.classes.android.app.Notification$Builder;
   var R = { drawable: JNI.classes.android.R$drawable };
 
+  var StringArray = JNI.classes.java.lang.String.array;
   var IntArray = JNI.classes.int.array;
   var Arrays = JNI.classes.java.util.Arrays;
 
@@ -125,6 +131,13 @@ function showNotification(aWindow) {
   var after  = JNI.ReadString(jenv, Arrays.toString(ia));
   ia = ia.getElements(0, ia.length);
   android_log(3, "JNI", before + " -> " + after+" ("+ia+")");
+
+  // Sort an array of strings, the same way
+  var sa = StringArray.new(5);
+  sa.setElements(0, ["the", "quick", "brown", "fox", "jumped"]);
+  Arrays['sort([Ljava/lang/Object;)V'](sa); // overloaded static method
+  sa = sa.getElements(0, sa.length).map(function(s) JNI.ReadString(jenv, s));
+  android_log(3, "JNI", "Sorted string array: "+sa.join(','));
 
   // demonstrate how to use toString() on a Java object
   aWindow.NativeWindow.toast.show(JNI.ReadString(jenv,noti.toString()),"short");

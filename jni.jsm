@@ -898,6 +898,15 @@ function JNIClassSig(jenv, jcls) {
   }
 }
 
+// create dispatch method
+// we resolve overloaded methods only by # of arguments.  If you need
+// further resolution, use the 'long form' of the method name, ie:
+//    obj['toString()Ljava/lang/String'].call(obj);
+var overloadFunc = function(basename) {
+  return function() {
+    return this[basename+'('+arguments.length+')'].apply(this, arguments);
+  };
+};
 
 // Create appropriate wrapper fields/methods for a Java class.
 function JNILoadClass(jenv, classSig, opt_props) {
@@ -1047,9 +1056,10 @@ function JNILoadClass(jenv, classSig, opt_props) {
     var ty = sig2type(returnSig), nm = returnSig;
     var call = "CallStatic"+ty+"Method";
     ensureLoaded(jenv, nm);
-    r[mtd.name] = r[mtd.name + mtd.sig] =
+    r[mtd.name] = rpp[mtd.name] = overloadFunc(mtd.name);
+    r[mtd.name + mtd.sig] = r[mtd.name+'('+(argctypes.length-1)+')'] =
     // add static methods to object instances, too.
-    rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
+    rpp[mtd.name + mtd.sig] = rpp[mtd.name+'('+(argctypes.length-1)+')'] = function() {
       var i, j = jenvpp();
       var args = [jenv, jcls, jmtd];
       for (i=0; i<arguments.length; i++) {
@@ -1063,7 +1073,9 @@ function JNILoadClass(jenv, classSig, opt_props) {
     var jmtd = jenvpp().GetMethodID(jenv, jcls, mtd.name, mtd.sig);
     var argctypes = mtd.sig.match(sigRegex()).map(function(s) sig2ctype(s));
     var returnSig = mtd.sig.substring(mtd.sig.indexOf(')')+1);
-    r['new'] = r['new'+mtd.sig] = r[mtd.name + mtd.sig] = function() {
+
+    r['new'] = overloadFunc('new');
+    r['new'+mtd.sig] = r['new('+(argctypes.length-1)+')'] = function() {
       var i, j = jenvpp();
       var args = [jenv, jcls, jmtd];
       for (i=0; i<arguments.length; i++) {
@@ -1095,7 +1107,8 @@ function JNILoadClass(jenv, classSig, opt_props) {
     var ty = sig2type(returnSig), nm = returnSig;
     var call = "Call"+ty+"Method";
     ensureLoaded(jenv, nm);
-    rpp[mtd.name] = rpp[mtd.name + mtd.sig] = function() {
+    rpp[mtd.name] = overloadFunc(mtd.name);
+    rpp[mtd.name + mtd.sig] = rpp[mtd.name+'('+(argctypes.length-1)+')'] = function() {
       var i, j = jenvpp();
       var args = [jenv, unwrap(this), jmtd];
       for (i=0; i<arguments.length; i++) {
