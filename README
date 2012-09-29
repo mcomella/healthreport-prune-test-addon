@@ -1,27 +1,11 @@
-Skeleton for an Add-on in Firefox on Android
-============================================
+Restartless native Fennec add-on to set testing prefs for product announcements feature.
 
-This code supplies the basic bits and pieces needed to build a simple,
-restartless add-on for Firefox on Android, which uses a new native widget UI.
-Since Firefox on Android does not use XUL for the UI, building an add-on is a
-little different.
+Based on cscott/skeleton-addon-fxandroid.
 
-For more information about building mobile add-ons, please see:
-https://developer.mozilla.org/en/Extensions/Firefox_on_Android
+What to do:
 
-Using the Skeleton
-==================
+* Edit config_build.sh to set ANDROID_APP_ID to the product you're testing (e.g., org.mozilla.fennec).
+* Edit bootstrap.js, setting ANNO_URL to the server URL and ANNO_INTERVAL to the check interval in milliseconds.
+* Run build.sh with your device connected and reachable over ADB.
 
-Step 1: Edit the install.rdf
-  * Please change the ALL CAPS areas with text specific to your add-on
-
-Step 2: Add code to bootstrap.js
-  * The current code adds some menus, doorhangers and context menus that don't
-    do very much right now.
-
-Step 3: Edit config_build.sh
-  * If you add any additional files, make sure you add them to config_build.sh
-    See build.sh for more details
-
-Step 4: run ./build.sh
-  * This creates the XPI
+Ask rnewman if you have other questions.

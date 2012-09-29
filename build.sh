@@ -39,6 +39,8 @@ BEFORE_BUILD=      # run this before building       (bash command)
 AFTER_BUILD=       # ...and this after the build    (bash command)
 PUSH_TO_DEVICE=    # push add-on to Android device after build. Assumes adb is installed (1/0)
 ANDROID_APP_ID=    # Firefox for Android app id (e.g. org.mozilla.firefox, org.mozilla.fennec)
+MKDIR="mkdir -p"
+CPPARENTS="rsync -R"
 
 if [ -z $1 ]; then
   . ./config_build.sh
@@ -64,7 +66,7 @@ rm -rf $TMP_DIR
 
 $BEFORE_BUILD
 
-mkdir --parents --verbose $TMP_DIR/chrome
+$MKDIR $TMP_DIR/chrome
 
 # generate the JAR file, excluding CVS, SVN, and temporary files
 JAR_FILE=$TMP_DIR/chrome/$APP_NAME.jar
@@ -82,16 +84,16 @@ echo $JAR_FILE > files
 # prepare components and defaults
 echo "Copying various files to $TMP_DIR folder..."
 for DIR in $ROOT_DIRS; do
-  mkdir $TMP_DIR/$DIR
+  $MKDIR $TMP_DIR/$DIR
   FILES="`find $DIR \( -path '*CVS*' -o -path '*.svn*' \) -prune -o -type f -print | grep -v \~`"
   echo $FILES >> files
-  cp --verbose --parents $FILES $TMP_DIR
+  $CPPARENTS $FILES $TMP_DIR
 done
 
 # Copy other files to the root of future XPI.
 for ROOT_FILE in $ROOT_FILES install.rdf chrome.manifest; do
   if [ -f $ROOT_FILE ]; then
-    cp --verbose $ROOT_FILE $TMP_DIR
+    cp $ROOT_FILE $TMP_DIR
     echo $ROOT_FILE >> files
   fi
 done
