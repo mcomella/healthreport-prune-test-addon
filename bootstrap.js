@@ -101,7 +101,7 @@ function setAnnouncementsPrefs(url, interval) {
   let context = GeckoApp.mAppContext;
 
   let editor = context.getSharedPreferences("background", 0).edit();
-  editor.putString("announce_server_url", url);
+  editor.putString("announce_server_base_url", url);
   editor.putLong("announce_fetch_interval_msec", interval);
   editor.commit();
   android_log(3, "GeckoSetPrefs", "Committed.");
