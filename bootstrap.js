@@ -113,6 +113,7 @@ function setAnnouncementsPrefs(url, interval) {
   let editor = context.getSharedPreferences("background", 0).edit();
   editor.putString("announce_server_base_url", url);
   editor.putLong("announce_fetch_interval_msec", interval);
+  editor.putLong("earliest_next_announce_fetch", 0);
   editor.commit();
   android_log(3, "GeckoSetPrefs", "Committed.");
 
