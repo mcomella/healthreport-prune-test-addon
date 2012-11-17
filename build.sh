@@ -3,7 +3,9 @@
 #   by Nickolay Ponomarev <asqueella@gmail.com>
 #   (original version based on Nathan Yergler's build script)
 # Most recent version is at <http://kb.mozillazine.org/Bash_build_script>
-
+#
+# Some fixes applied by rnewman.
+#
 # This script assumes the following directory structure:
 # ./
 #   chrome.manifest (optional - for newer extensions)
