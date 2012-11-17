@@ -2,7 +2,7 @@
  * Test values.
  * Change these to whatever you want, then build and deploy the XPI.
  */
-const ANNO_URL = "http://twinql.com/tmp/announce/";
+const ANNO_URL = "http://aws-campaign-manager-dev.services.mozilla.com/announce/";
 const ANNO_INTERVAL = 15000;
 
 
