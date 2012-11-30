@@ -63,8 +63,9 @@ function loadJNI() {
   try {
     let AnnouncementsConstants = JNI.LoadClass(jenv, "org.mozilla.gecko.background.announcements.AnnouncementsConstants", {
       static_fields: [
-        { name: "MINIMUM_FETCH_INTERVAL_MSEC", sig: "J" },
         { name: "DEFAULT_BACKOFF_MSEC", sig: "J" },
+        { name: "DISABLED", sig: "Z" },
+        { name: "MINIMUM_FETCH_INTERVAL_MSEC", sig: "J" },
       ],
     });
   } catch (ex) {
@@ -121,8 +122,9 @@ function setAnnouncementsPrefs(url, interval) {
   try {
     let AnnouncementsConstants = JNI.classes.org.mozilla.gecko.background.announcements.AnnouncementsConstants;
     android_log(3, "GeckoSetPrefs", "Setting MINIMUM_FETCH_INTERVAL_MSEC to " + interval);
-    AnnouncementsConstants.MINIMUM_FETCH_INTERVAL_MSEC = interval;
     AnnouncementsConstants.DEFAULT_BACKOFF_MSEC = 100;  // So we retry on error.
+    AnnouncementsConstants.DISABLED = false;
+    AnnouncementsConstants.MINIMUM_FETCH_INTERVAL_MSEC = interval;
   } catch (ex) {
     android_log(3, "GeckoSetPrefs", "Error setting AnnouncementsConstants.MINIMUM_FETCH_INTERVAL_MSEC.");
   }
@@ -141,6 +143,9 @@ function loadIntoWindow(window) {
     return;
   }
 
+  // Always enable.
+  let AnnouncementsConstants = JNI.classes.org.mozilla.gecko.background.announcements.AnnouncementsConstants;
+  AnnouncementsConstants.DISABLED = false;
   menuID = window.NativeWindow.menu.add("Set announcements prefs", null,
       function() {
         setAnnouncementsPrefs(ANNO_URL, ANNO_INTERVAL);
