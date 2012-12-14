@@ -103,6 +103,25 @@ function _broadcastAnnouncementsPref(context) {
   android_log(3, "GeckoSetPrefs", "Announcement broadcast.");
 }
 
+function increaseIdle() {
+  let jenv = setupJNI();
+
+  android_log(3, "GeckoSetPrefs", "Pushing last launch back.");
+  let Context = JNI.classes.android.content.Context;
+  let GeckoApp = JNI.classes.org.mozilla.gecko.GeckoApp;
+  let context = GeckoApp.mAppContext;
+  let sharedPrefs = context.getSharedPreferences("background", 0);
+  let lastLaunch = sharedPrefs.getLong("last_firefox_launch", Date.now());
+  let older = lastLaunch - (24 * 60 * 60 * 1000);
+  android_log(3, "GeckoSetPrefs", "Setting last launch to " + older);
+  let editor = sharedPrefs.edit();
+  editor.putLong("last_firefox_launch", older);
+  editor.commit();
+  android_log(3, "GeckoSetPrefs", "Committed.");
+
+  teardownJNI(jenv);
+}
+
 function setAnnouncementsPrefs(url, interval) {
   let jenv = setupJNI();
 
@@ -135,7 +154,8 @@ function setAnnouncementsPrefs(url, interval) {
   teardownJNI(jenv);
 }
  
-let menuID = null;
+let prefMenuID = null;
+let ageMenuID = null;
 
 function loadIntoWindow(window) {
   android_log(3, "GeckoSetPrefs", "Loading into window.");
@@ -146,9 +166,13 @@ function loadIntoWindow(window) {
   // Always enable.
   let AnnouncementsConstants = JNI.classes.org.mozilla.gecko.background.announcements.AnnouncementsConstants;
   AnnouncementsConstants.DISABLED = false;
-  menuID = window.NativeWindow.menu.add("Set announcements prefs", null,
+  prefMenuID = window.NativeWindow.menu.add("Set announcements prefs", null,
       function() {
         setAnnouncementsPrefs(ANNO_URL, ANNO_INTERVAL);
+      });
+  ageMenuID = window.NativeWindow.menu.add("Increase idle record", null,
+      function() {
+        increaseIdle();
       });
   android_log(3, "GeckoSetPrefs", "Done loading.");
 }
@@ -158,7 +182,8 @@ function unloadFromWindow(window) {
     return;
   }
 
-  window.NativeWindow.menu.remove(menuID);
+  window.NativeWindow.menu.remove(prefMenuID);
+  window.NativeWindow.menu.remove(ageMenuID);
 }
 
 
