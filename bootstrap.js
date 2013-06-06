@@ -2,13 +2,15 @@
  * Test values.
  * Change these to whatever you want, then build and deploy the XPI.
  */
-const ANNO_URL = "http://CampaignManager-Stage-272259297.us-east-1.elb.amazonaws.com/announce/";
-const ANNO_INTERVAL = 15000;
+const HRU_URL = "https://fhr.data.mozilla.com";
+const HRU_INTERVAL = 15*1000;
 
 
 /**
  * Actual code follows.
  */
+
+let LOG_TAG = "GeckoSetPrefs";
 
 const RSRC = "basicnative-mobile"; // resource prefix
 const Cc = Components.classes;
@@ -32,15 +34,15 @@ function loadJNI() {
     ],
   });
 
-  let GeckoApp = JNI.LoadClass(jenv, "org.mozilla.gecko.GeckoApp", {
-    static_fields: [
-      { name: "mAppContext", sig: "Lorg/mozilla/gecko/GeckoApp;" }
+  let GeckoAppShell = JNI.LoadClass(jenv, "org.mozilla.gecko.GeckoAppShell", {
+    static_methods: [
+      { name: "getContext", sig: "()Landroid/content/Context;" }
     ],
   });
 
   let GeckoPreferences = JNI.LoadClass(jenv, "org.mozilla.gecko.GeckoPreferences", {
     static_methods: [
-      { name: "broadcastAnnouncementsPref", sig: "(Landroid/content/Context;)V" },
+      { name: "broadcastHealthReportUploadPref", sig: "(Landroid/content/Context;)V" },
     ],
   });
 
@@ -49,27 +51,30 @@ function loadJNI() {
       { name: "edit", sig: "()Landroid/content/SharedPreferences$Editor;" },
       { name: "getLong", sig: "(Ljava/lang/String;J)J" },
       { name: "getString", sig: "(Ljava/lang/String;Ljava/lang/String;)Ljava/lang/String;" },
+      { name: "getBoolean", sig: "(Ljava/lang/String;Z)Z" },
     ],
   });
 
   let SharedPreferencesEditor = JNI.LoadClass(jenv, "android.content.SharedPreferences$Editor", {
     methods: [
       { name: "commit", sig: "()Z" },
-      { name: "putString", sig: "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;" },
       { name: "putLong", sig: "(Ljava/lang/String;J)Landroid/content/SharedPreferences$Editor;" },
+      { name: "putString", sig: "(Ljava/lang/String;Ljava/lang/String;)Landroid/content/SharedPreferences$Editor;" },
+      { name: "putBoolean", sig: "(Ljava/lang/String;Z)Landroid/content/SharedPreferences$Editor;" },
     ],
   });
 
-  try {
-    let AnnouncementsConstants = JNI.LoadClass(jenv, "org.mozilla.gecko.background.announcements.AnnouncementsConstants", {
-      static_fields: [
-        { name: "DEFAULT_BACKOFF_MSEC", sig: "J" },
-        { name: "DISABLED", sig: "Z" },
-        { name: "MINIMUM_FETCH_INTERVAL_MSEC", sig: "J" },
-      ],
-    });
-  } catch (ex) {
-  }
+  let HealthReportConstants = JNI.LoadClass(jenv, "org.mozilla.gecko.background.healthreport.HealthReportConstants", {
+    static_fields: [
+      { name: "UPLOAD_FEATURE_DISABLED", sig: "Z" },
+    ],
+  });
+
+  let Logger = JNI.LoadClass(jenv, "org.mozilla.gecko.background.common.log.Logger", {
+    static_fields: [
+      { name: "LOG_PERSONAL_INFORMATION", sig: "Z" },
+    ],
+  });
 
   let Context = JNI.LoadClass(jenv, "android.content.Context", {
     methods: [
@@ -77,6 +82,13 @@ function loadJNI() {
         sig: "(Ljava/lang/String;I)Landroid/content/SharedPreferences;" },
       { name: "getSystemService",
         sig: "(Ljava/lang/String;)Ljava/lang/Object;" }
+    ],
+  });
+
+  let PreferenceManager = JNI.LoadClass(jenv, "android.preference.PreferenceManager", {
+    static_methods: [
+      { name: "getDefaultSharedPreferences",
+        sig: "(Landroid/content/Context;)Landroid/content/SharedPreferences;" },
     ],
   });
 }
@@ -97,84 +109,58 @@ function teardownJNI(jenv) {
   jenv.contents.contents.PopLocalFrame(jenv, null);
 }
   
-function _broadcastAnnouncementsPref(context) {
+function _broadcastPref(context) {
   let GeckoPreferences = JNI.classes.org.mozilla.gecko.GeckoPreferences;
-  GeckoPreferences.broadcastAnnouncementsPref(context);
-  android_log(3, "GeckoSetPrefs", "Announcement broadcast.");
+  GeckoPreferences.broadcastHealthReportUploadPref(context);
+  android_log(3, LOG_TAG, "Broadcast pref.");
 }
 
-function increaseIdle() {
+function setPrefs(url, interval) {
   let jenv = setupJNI();
 
-  android_log(3, "GeckoSetPrefs", "Pushing last launch back.");
+  android_log(3, LOG_TAG, "Set prefs to " + url + ", " + interval);
   let Context = JNI.classes.android.content.Context;
-  let GeckoApp = JNI.classes.org.mozilla.gecko.GeckoApp;
-  let context = GeckoApp.mAppContext;
-  let sharedPrefs = context.getSharedPreferences("background", 0);
-  let lastLaunch = sharedPrefs.getLong("last_firefox_launch", Date.now());
-  let older = lastLaunch - (24 * 60 * 60 * 1000);
-  android_log(3, "GeckoSetPrefs", "Setting last launch to " + older);
-  let editor = sharedPrefs.edit();
-  editor.putLong("last_firefox_launch", older);
+  let GeckoAppShell = JNI.classes.org.mozilla.gecko.GeckoAppShell;
+  let context = GeckoAppShell.getContext();
+
+  let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
+  let prefs = context.getSharedPreferences("healthreport", 0);
+  let editor = prefs.edit();
+  // editor.putString("announce_server_base_url", url);
+  editor.putLong("upload_interval_msec", interval);
   editor.commit();
-  android_log(3, "GeckoSetPrefs", "Committed.");
 
-  teardownJNI(jenv);
-}
+  let PreferenceManager = JNI.classes.android.preference.PreferenceManager;
+  let globalPrefs = PreferenceManager.getDefaultSharedPreferences(context);
+  let globalEditor = globalPrefs.edit();
+  globalEditor.putBoolean("android.not_a_preference.healthreport.uploadEnabled",
+                    !globalPrefs.getBoolean("android.not_a_preference.healthreport.uploadEnabled", false));
+  globalEditor.commit();
 
-function setAnnouncementsPrefs(url, interval) {
-  let jenv = setupJNI();
-
-  android_log(3, "GeckoSetPrefs", "Set prefs to " + url + ", " + interval);
-  let Context = JNI.classes.android.content.Context;
-  let GeckoApp = JNI.classes.org.mozilla.gecko.GeckoApp;
-  let context = GeckoApp.mAppContext;
-
-  let editor = context.getSharedPreferences("background", 0).edit();
-  editor.putString("announce_server_base_url", url);
-  editor.putLong("announce_fetch_interval_msec", interval);
-  editor.putLong("earliest_next_announce_fetch", 0);
-  editor.commit();
-  android_log(3, "GeckoSetPrefs", "Committed.");
-
-  // Set the minimum to our interval.
-  try {
-    let AnnouncementsConstants = JNI.classes.org.mozilla.gecko.background.announcements.AnnouncementsConstants;
-    android_log(3, "GeckoSetPrefs", "Setting MINIMUM_FETCH_INTERVAL_MSEC to " + interval);
-    AnnouncementsConstants.DEFAULT_BACKOFF_MSEC = 100;  // So we retry on error.
-    AnnouncementsConstants.DISABLED = false;
-    AnnouncementsConstants.MINIMUM_FETCH_INTERVAL_MSEC = interval;
-  } catch (ex) {
-    android_log(3, "GeckoSetPrefs", "Error setting AnnouncementsConstants.MINIMUM_FETCH_INTERVAL_MSEC.");
-  }
+  android_log(3, LOG_TAG, "Committed.");
 
   // Now broadcast so that we refresh.
-  _broadcastAnnouncementsPref(context);
+  _broadcastPref(context);
 
   teardownJNI(jenv);
 }
  
-let prefMenuID = null;
-let ageMenuID = null;
+let menuID = null;
 
 function loadIntoWindow(window) {
-  android_log(3, "GeckoSetPrefs", "Loading into window.");
+  android_log(3, LOG_TAG, "Loading into window.");
   if (!window || !isNativeUI()) {
     return;
   }
 
   // Always enable.
-  let AnnouncementsConstants = JNI.classes.org.mozilla.gecko.background.announcements.AnnouncementsConstants;
-  AnnouncementsConstants.DISABLED = false;
-  prefMenuID = window.NativeWindow.menu.add("Set announcements prefs", null,
+  let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
+  HealthReportConstants.UPLOAD_FEATURE_DISABLED = false;
+  menuID = window.NativeWindow.menu.add("Toggle FHR upload", null,
       function() {
-        setAnnouncementsPrefs(ANNO_URL, ANNO_INTERVAL);
+        setPrefs(HRU_URL, HRU_INTERVAL);
       });
-  ageMenuID = window.NativeWindow.menu.add("Increase idle record", null,
-      function() {
-        increaseIdle();
-      });
-  android_log(3, "GeckoSetPrefs", "Done loading.");
+  android_log(3, LOG_TAG, "Done loading.");
 }
 
 function unloadFromWindow(window) {
@@ -182,8 +168,7 @@ function unloadFromWindow(window) {
     return;
   }
 
-  window.NativeWindow.menu.remove(prefMenuID);
-  window.NativeWindow.menu.remove(ageMenuID);
+  window.NativeWindow.menu.remove(menuID);
 }
 
 

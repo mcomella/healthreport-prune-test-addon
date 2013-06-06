@@ -1,11 +1,17 @@
-Restartless native Fennec add-on to set testing prefs for product announcements feature.
+Restartless native Fennec add-on to set testing prefs for Firefox
+Health Report upload feature.
 
-Based on cscott/skeleton-addon-fxandroid.
+Based on cscott/skeleton-addon-fxandroid and
+mozilla-services/product-announcements-test-addon.
 
 What to do:
 
-* Edit config_build.sh to set ANDROID_APP_ID to the product you're testing (e.g., org.mozilla.fennec).
-* Edit bootstrap.js, setting ANNO_URL to the server URL and ANNO_INTERVAL to the check interval in milliseconds.
+* Edit config_build.sh to set ANDROID_APP_ID to the product you're
+  testing (e.g., org.mozilla.fennec_$USER).
+
+* Edit bootstrap.js, setting ANNO_URL to the server URL and
+  ANNO_INTERVAL to the check interval in milliseconds.
+
 * Run build.sh with your device connected and reachable over ADB.
 
-Ask rnewman if you have other questions.
+Ask nalexander or rnewman if you have other questions.
