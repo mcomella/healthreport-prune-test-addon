@@ -126,8 +126,11 @@ function setPrefs(url, interval) {
   let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
   let prefs = context.getSharedPreferences("healthreport", 0);
   let editor = prefs.edit();
-  // editor.putString("announce_server_base_url", url);
+  editor.putString("document_server_uri", url);
   editor.putLong("upload_interval_msec", interval);
+  editor.putLong("time_between_uploads", 4*interval);
+  editor.putLong("time_before_first_upload", 2*interval);
+  editor.putLong("time_after_failure", interval);
   editor.commit();
 
   let PreferenceManager = JNI.classes.android.preference.PreferenceManager;
