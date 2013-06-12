@@ -3,7 +3,7 @@
  * Change these to whatever you want, then build and deploy the XPI.
  */
 const HRU_URL = "https://fhr.data.mozilla.com";
-const HRU_INTERVAL = 15*1000;
+const HRU_INTERVAL = 10*1000;
 
 
 /**
@@ -124,13 +124,15 @@ function setPrefs(url, interval) {
   let context = GeckoAppShell.getContext();
 
   let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
-  let prefs = context.getSharedPreferences("healthreport", 0);
+  let prefs = context.getSharedPreferences("background", 0);
   let editor = prefs.edit();
-  editor.putString("document_server_uri", url);
-  editor.putLong("upload_interval_msec", interval);
-  editor.putLong("time_between_uploads", 4*interval);
-  editor.putLong("time_before_first_upload", 2*interval);
-  editor.putLong("time_after_failure", interval);
+  editor.putString("healthreport_document_server_uri", url);
+  editor.putLong("healthreport_submission_intent_interval_msec", interval);
+  editor.putLong("healthreport_next_submission", 0);
+  editor.putLong("healthreport_time_between_uploads", 4*interval);
+  editor.putLong("healthreport_time_between_deletes", 2*interval);
+  editor.putLong("healthreport_time_before_first_submission", 2*interval);
+  editor.putLong("healthreport_time_after_failure", interval);
   editor.commit();
 
   let PreferenceManager = JNI.classes.android.preference.PreferenceManager;
