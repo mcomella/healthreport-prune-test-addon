@@ -2,8 +2,8 @@
  * Test values.
  * Change these to whatever you want, then build and deploy the XPI.
  */
-const HRU_URL = "https://fhr.data.mozilla.com";
-const HRU_INTERVAL = 10*1000;
+const HRU_URL = "https://fhr-dev.allizom.org/en-US/mobile/";
+const HRU_INTERVAL = 60*1000;
 
 
 /**
