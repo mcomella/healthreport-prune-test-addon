@@ -18,16 +18,6 @@ const mainUrl = data.url("lab.html");
 function openBackgroundServicesLab() {
   console.log("openBackgroundServicesLab");
 
-  for (let tab of tabs) {
-    if (tab && tab.url == mainUrl) {
-      console.log("Background Services Lab is already open; reloading.");
-      tab.reload();
-      return;
-    }
-  }
-
-  console.log("Background Services Lab is not open; opening.");
-
   tabs.open({
     url: mainUrl,
     onReady: function (tab) {
@@ -67,8 +57,6 @@ exports.main = function (options, callbacks) {
   helper.loadJNI();
   console.log("main");
   addMenuItem();
-
-  openBackgroundServicesLab();
 };
 
 exports.onUnload = function (reason) {
