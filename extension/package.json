@@ -1,0 +1,11 @@
+{
+  "name": "background-services-lab",
+  "fullName": "Background Services Lab",
+  "id": "jid1-mmCQYHf9H9DBhg",
+  "description": "Laboratory for testing background services.\nThis add-on exposes internal Firefox background services state provides and an interface for testers to trigger events that might usually occur infrequently.",
+  "author": "Nick Alexander, Richard Newman",
+  "license": "MPL 2.0",
+  "version": "0.3",
+  "icon": "data/icon.png",
+  "icon64": "data/icon64.png"
+}

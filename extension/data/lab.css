@@ -1,0 +1,30 @@
+.link {
+    background-color: transparent;
+    border: none;
+    color: blue;
+    cursor: pointer;
+}
+
+.link:hover {
+   text-decoration: underline;
+}
+
+.buttons li {
+    margin-bottom: 1ex;
+}
+
+.key {
+    background-color: rgb(255, 255, 238);
+}
+
+.val {
+    background-color: rgb(245, 242, 240);
+}
+
+.settings {
+    width: 100%;
+}
+
+.disabled {
+    background-color: rgb(255,39,39);
+}
