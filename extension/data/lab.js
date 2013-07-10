@@ -16,6 +16,10 @@ self.port.on("settings-response", function(data) {
 
   for (let key of keys) {
     let val = data.prefs[key];
+    try {
+      val = JSON.stringify(JSON.parse(val), null, 4);
+    } catch (e) {
+    }
 
     let elkey = document.createElement("td");
     elkey.appendChild(document.createTextNode(key));
@@ -27,8 +31,10 @@ self.port.on("settings-response", function(data) {
     let elval = document.createElement("td");
     elval.appendChild(document.createTextNode(val));
     elval.classList.add("val");
+    let elvalpre = document.createElement("pre");
+    elvalpre.appendChild(elval);
     let elvalrow = document.createElement("tr");
-    elvalrow.appendChild(elval);
+    elvalrow.appendChild(elvalpre);
     container.appendChild(elvalrow);
   }
 
