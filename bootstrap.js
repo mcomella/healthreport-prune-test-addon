@@ -109,8 +109,8 @@ let buttons = [
       setPrefs(HRP_INTERVAL, function (editor, interval) {
         android_log(3, LOG_TAG, 'Enabling prune by size.');
         editor.putLong('healthreport_prune_by_size_time', 0);
-      }
-    })
+      });
+    }
   },
   {
     name: 'Expire',
@@ -118,8 +118,8 @@ let buttons = [
       setPrefs(HRP_INTERVAL, function (editor, interval) {
         android_log(3, LOG_TAG, 'Enabling expiration');
         editor.putLong('healthreport_expiration_time', 0);
-      }
-    })
+      });
+    }
   },
   {
     name: 'Cleanup (vacuum)',
@@ -127,8 +127,8 @@ let buttons = [
       setPrefs(HRP_INTERVAL, function (editor, interval) {
         android_log(3, LOG_TAG, 'Enabling cleanup (vacuum)');
         editor.putLong('healthreport_cleanup_time', 0);
-      }
-    })
+      });
+    }
   }];
 
 function loadIntoWindow(window) {
