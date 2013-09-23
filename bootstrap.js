@@ -33,7 +33,7 @@ function loadJNI() {
 
   let GeckoPreferences = JNI.LoadClass(jenv, "org.mozilla.gecko.GeckoPreferences", {
     static_methods: [
-      { name: "broadcastHealthReportUploadPref", sig: "(Landroid/content/Context;)V" },
+      { name: "broadcastHealthReportPrune", sig: "(Landroid/content/Context;)V" },
     ],
   });
 
