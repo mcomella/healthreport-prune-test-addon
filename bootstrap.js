@@ -162,7 +162,7 @@ function setPrefs(interval, editCallback) {
 
   editCallback(editor, interval);
   editor.commit();
-  android_log(3, LOG_TAG, 'Committed. Broadcasting...');
+  android_log(3, LOG_TAG, 'Preferences committed.');
 
   // Now broadcast so that we refresh.
   _broadcastPref(context);
