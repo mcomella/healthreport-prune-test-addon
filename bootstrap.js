@@ -99,7 +99,7 @@ function teardownJNI(jenv) {
   // Clean up memory allocated by JNI.
   jenv.contents.contents.PopLocalFrame(jenv, null);
 }
-  
+
 function _broadcastPref(context) {
   let GeckoPreferences = JNI.classes.org.mozilla.gecko.GeckoPreferences;
   GeckoPreferences.broadcastHealthReportUploadPref(context);
@@ -140,7 +140,7 @@ function setPrefs(url, interval) {
 
   teardownJNI(jenv);
 }
- 
+
 let menuID = null;
 
 function loadIntoWindow(window) {
@@ -180,10 +180,10 @@ var windowListener = {
       loadIntoWindow(domWindow);
     }, false);
   },
-  
+
   onCloseWindow: function(aWindow) {
   },
-  
+
   onWindowTitleChange: function(aWindow, aTitle) {
   }
 };
