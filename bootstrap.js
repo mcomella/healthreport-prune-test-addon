@@ -100,7 +100,7 @@ function teardownJNI(jenv) {
   jenv.contents.contents.PopLocalFrame(jenv, null);
 }
 
-let menuID = null;
+let menuIDs = null;
 const BUTTON_NAME_PREFIX = 'FHR Prune: ';
 let buttons = [
   {
@@ -141,7 +141,7 @@ function loadIntoWindow(window) {
   let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
   HealthReportConstants.UPLOAD_FEATURE_DISABLED = true;
 
-  menuID = buttons.map(function (button) {
+  menuIDs = buttons.map(function (button) {
     button.name = BUTTON_NAME_PREFIX + button.name;
     return window.NativeWindow.menu.add(button);
   });
@@ -181,7 +181,9 @@ function unloadFromWindow(window) {
     return;
   }
 
-  window.NativeWindow.menu.remove(menuID);
+  menuIDs.forEach(function (menuID) {
+    window.NativeWindow.menu.remove(menuID);
+  }
 }
 
 
