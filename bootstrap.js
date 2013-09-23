@@ -174,8 +174,8 @@ function setPrefs(interval) {
 
 function _broadcastPref(context) {
   let GeckoPreferences = JNI.classes.org.mozilla.gecko.GeckoPreferences;
-  GeckoPreferences.broadcastHealthReportUploadPref(context);
-  android_log(3, LOG_TAG, "Broadcast pref.");
+  GeckoPreferences.broadcastHealthReportPrune(context);
+  android_log(3, LOG_TAG, 'Broadcast prune pref.');
 }
 
 function unloadFromWindow(window) {
