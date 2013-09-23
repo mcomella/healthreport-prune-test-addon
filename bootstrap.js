@@ -1,14 +1,5 @@
-/**
- * Test values.
- * Change these to whatever you want, then build and deploy the XPI.
- */
-const HRU_URL = "https://fhr-dev.allizom.org/en-US/mobile/";
-const HRU_INTERVAL = 60*1000;
-
-
-/**
- * Actual code follows.
- */
+ // Change this to whatever you want, then build and deploy the XPI.
+const HRP_INTERVAL = 60*1000; // Millis.
 
 let LOG_TAG = "GeckoSetPrefs";
 
