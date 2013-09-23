@@ -2,13 +2,13 @@
 <RDF xmlns="http://www.w3.org/1999/02/22-rdf-syntax-ns#" xmlns:em="http://www.mozilla.org/2004/em-rdf#">
 
     <Description about="urn:mozilla:install-manifest">
-        <em:id>set.healthreport.upload.prefs@ncalexander.net</em:id>
+        <em:id>set.healthreport.prune.prefs@mcomella.me</em:id>
         <em:type>2</em:type>
-        <em:name>Set Health Report Upload Prefs</em:name>
+        <em:name>Set Health Report Prune Prefs</em:name>
         <em:version>1.0</em:version>
         <em:bootstrap>true</em:bootstrap>
-        <em:description>A small restartless addon to enable QA testing of Android Firefox Health Report uploads.</em:description>
-        <em:creator>Richard Newman</em:creator>
+        <em:description>A small restartless addon to enable QA testing of Android Firefox Health Report pruning.</em:description>
+        <em:creator>Michael Comella</em:creator>
 
         <!-- Mobile -->
         <em:targetApplication>
