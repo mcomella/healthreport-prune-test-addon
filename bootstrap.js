@@ -101,24 +101,33 @@ function teardownJNI(jenv) {
 }
 
 let menuID = null;
-let buttonTextPrefix = 'FHR Prune: ';
+const BUTTON_NAME_PREFIX = 'FHR Prune: ';
 let buttons = [
   {
     name: 'By size',
     callback: function () {
-      setPrefs(HRP_INTERVAL); // TODO: This.
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling prune by size.');
+        editor.putLong('healthreport_prune_by_size_time', 0);
+      }
     })
   },
   {
     name: 'Expire',
     callback: function () {
-      setPrefs(HRP_INTERVAL); // TODO: This.
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling expiration');
+        editor.putLong('healthreport_expiration_time', 0);
+      }
     })
   },
   {
-    name: 'Vacuum',
+    name: 'Cleanup (vacuum)',
     callback: function () {
-      setPrefs(HRP_INTERVAL); // TODO: This.
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling cleanup (vacuum)');
+        editor.putLong('healthreport_cleanup_time', 0);
+      }
     })
   }];
 
@@ -133,38 +142,27 @@ function loadIntoWindow(window) {
   HealthReportConstants.UPLOAD_FEATURE_DISABLED = true;
 
   menuID = buttons.map(function (button) {
+    button.name = BUTTON_NAME_PREFIX + button.name;
     return window.NativeWindow.menu.add(button);
   });
   android_log(3, LOG_TAG, "Done loading.");
 }
 
-function setPrefs(interval) {
+function setPrefs(interval, editCallback) {
   let jenv = setupJNI();
 
-  android_log(3, LOG_TAG, "Set interval pref to " + interval + "among other things");
   let Context = JNI.classes.android.content.Context;
   let GeckoAppShell = JNI.classes.org.mozilla.gecko.GeckoAppShell;
   let context = GeckoAppShell.getContext();
-
-  let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
-  let prefs = context.getSharedPreferences("background", 0);
+  let prefs = context.getSharedPreferences('background', 0);
   let editor = prefs.edit();
-  editor.putLong("healthreport_prune_intent_interval_msec", interval);
-  editor.putLong("healthreport_next_submission", 0);
-  editor.putLong("healthreport_time_between_uploads", 4*interval);
-  editor.putLong("healthreport_time_between_deletes", 2*interval);
-  editor.putLong("healthreport_time_before_first_submission", 2*interval);
-  editor.putLong("healthreport_time_after_failure", interval);
+
+  android_log(3, LOG_TAG, 'Setting interval pref to ' + interval + '.');
+  editor.putLong('healthreport_prune_intent_interval_msec', interval);
+
+  editCallback(editor, interval);
   editor.commit();
-
-  let PreferenceManager = JNI.classes.android.preference.PreferenceManager;
-  let globalPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-  let globalEditor = globalPrefs.edit();
-  globalEditor.putBoolean("android.not_a_preference.healthreport.uploadEnabled",
-                    !globalPrefs.getBoolean("android.not_a_preference.healthreport.uploadEnabled", false));
-  globalEditor.commit();
-
-  android_log(3, LOG_TAG, "Committed.");
+  android_log(3, LOG_TAG, 'Committed. Broadcasting...');
 
   // Now broadcast so that we refresh.
   _broadcastPref(context);
