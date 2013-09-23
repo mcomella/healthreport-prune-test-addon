@@ -1,14 +1,5 @@
-/**
- * Test values.
- * Change these to whatever you want, then build and deploy the XPI.
- */
-const HRU_URL = "https://fhr-dev.allizom.org/en-US/mobile/";
-const HRU_INTERVAL = 60*1000;
-
-
-/**
- * Actual code follows.
- */
+ // Change this to whatever you want, then build and deploy the XPI.
+const HRP_INTERVAL = 60*1000; // Millis.
 
 let LOG_TAG = "GeckoSetPrefs";
 
@@ -108,49 +99,37 @@ function teardownJNI(jenv) {
   // Clean up memory allocated by JNI.
   jenv.contents.contents.PopLocalFrame(jenv, null);
 }
-  
-function _broadcastPref(context) {
-  let GeckoPreferences = JNI.classes.org.mozilla.gecko.GeckoPreferences;
-  GeckoPreferences.broadcastHealthReportUploadPref(context);
-  android_log(3, LOG_TAG, "Broadcast pref.");
-}
 
-function setPrefs(url, interval) {
-  let jenv = setupJNI();
-
-  android_log(3, LOG_TAG, "Set prefs to " + url + ", " + interval);
-  let Context = JNI.classes.android.content.Context;
-  let GeckoAppShell = JNI.classes.org.mozilla.gecko.GeckoAppShell;
-  let context = GeckoAppShell.getContext();
-
-  let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
-  let prefs = context.getSharedPreferences("background", 0);
-  let editor = prefs.edit();
-  editor.putString("healthreport_document_server_uri", url);
-  editor.putLong("healthreport_submission_intent_interval_msec", interval);
-  editor.putLong("healthreport_next_submission", 0);
-  editor.putLong("healthreport_time_between_uploads", 4*interval);
-  editor.putLong("healthreport_time_between_deletes", 2*interval);
-  editor.putLong("healthreport_time_before_first_submission", 2*interval);
-  editor.putLong("healthreport_time_after_failure", interval);
-  editor.commit();
-
-  let PreferenceManager = JNI.classes.android.preference.PreferenceManager;
-  let globalPrefs = PreferenceManager.getDefaultSharedPreferences(context);
-  let globalEditor = globalPrefs.edit();
-  globalEditor.putBoolean("android.not_a_preference.healthreport.uploadEnabled",
-                    !globalPrefs.getBoolean("android.not_a_preference.healthreport.uploadEnabled", false));
-  globalEditor.commit();
-
-  android_log(3, LOG_TAG, "Committed.");
-
-  // Now broadcast so that we refresh.
-  _broadcastPref(context);
-
-  teardownJNI(jenv);
-}
- 
 let menuID = null;
+const BUTTON_NAME_PREFIX = 'FHR Prune: ';
+let buttons = [
+  {
+    name: 'By size',
+    callback: function () {
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling prune by size.');
+        editor.putLong('healthreport_prune_by_size_time', 0);
+      }
+    })
+  },
+  {
+    name: 'Expire',
+    callback: function () {
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling expiration');
+        editor.putLong('healthreport_expiration_time', 0);
+      }
+    })
+  },
+  {
+    name: 'Cleanup (vacuum)',
+    callback: function () {
+      setPrefs(HRP_INTERVAL, function (editor, interval) {
+        android_log(3, LOG_TAG, 'Enabling cleanup (vacuum)');
+        editor.putLong('healthreport_cleanup_time', 0);
+      }
+    })
+  }];
 
 function loadIntoWindow(window) {
   android_log(3, LOG_TAG, "Loading into window.");
@@ -158,14 +137,43 @@ function loadIntoWindow(window) {
     return;
   }
 
-  // Always enable.
+  // Turn it off upload so it does not get scheduled first.
   let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
-  HealthReportConstants.UPLOAD_FEATURE_DISABLED = false;
-  menuID = window.NativeWindow.menu.add("Toggle FHR upload", null,
-      function() {
-        setPrefs(HRU_URL, HRU_INTERVAL);
-      });
+  HealthReportConstants.UPLOAD_FEATURE_DISABLED = true;
+
+  menuID = buttons.map(function (button) {
+    button.name = BUTTON_NAME_PREFIX + button.name;
+    return window.NativeWindow.menu.add(button);
+  });
   android_log(3, LOG_TAG, "Done loading.");
+}
+
+function setPrefs(interval, editCallback) {
+  let jenv = setupJNI();
+
+  let Context = JNI.classes.android.content.Context;
+  let GeckoAppShell = JNI.classes.org.mozilla.gecko.GeckoAppShell;
+  let context = GeckoAppShell.getContext();
+  let prefs = context.getSharedPreferences('background', 0);
+  let editor = prefs.edit();
+
+  android_log(3, LOG_TAG, 'Setting interval pref to ' + interval + '.');
+  editor.putLong('healthreport_prune_intent_interval_msec', interval);
+
+  editCallback(editor, interval);
+  editor.commit();
+  android_log(3, LOG_TAG, 'Committed. Broadcasting...');
+
+  // Now broadcast so that we refresh.
+  _broadcastPref(context);
+
+  teardownJNI(jenv);
+}
+
+function _broadcastPref(context) {
+  let GeckoPreferences = JNI.classes.org.mozilla.gecko.GeckoPreferences;
+  GeckoPreferences.broadcastHealthReportPrune(context);
+  android_log(3, LOG_TAG, 'Broadcast prune pref.');
 }
 
 function unloadFromWindow(window) {
@@ -189,10 +197,10 @@ var windowListener = {
       loadIntoWindow(domWindow);
     }, false);
   },
-  
+
   onCloseWindow: function(aWindow) {
   },
-  
+
   onWindowTitleChange: function(aWindow, aTitle) {
   }
 };
