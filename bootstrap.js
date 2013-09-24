@@ -183,7 +183,7 @@ function unloadFromWindow(window) {
 
   menuIDs.forEach(function (menuID) {
     window.NativeWindow.menu.remove(menuID);
-  }
+  });
 }
 
 
