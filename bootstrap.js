@@ -137,10 +137,6 @@ function loadIntoWindow(window) {
     return;
   }
 
-  // Turn it off upload so it does not get scheduled first.
-  let HealthReportConstants = JNI.classes.org.mozilla.gecko.background.healthreport.HealthReportConstants;
-  HealthReportConstants.UPLOAD_FEATURE_DISABLED = true;
-
   menuIDs = buttons.map(function (button) {
     button.name = BUTTON_NAME_PREFIX + button.name;
     return window.NativeWindow.menu.add(button);
